@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Attunement Prototype</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --color-black: #000;
+            --color-white: #fff;
+            --color-hit: #00ff00; /* Green */
+            --color-miss: #ff0000; /* Red */
+        }
+
+        body {
+            font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--color-black);
+            color: var(--color-white);
+            min-height: 100dvh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            overflow: hidden;
+        }
+        
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            gap: 20px;
+        }
+
+        #game-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        #rules-column {
+            width: 90%;
+            max-width: 500px;
+            padding: 0 20px 20px 20px;
+            box-sizing: border-box;
+            background-color: var(--color-black);
+            border-radius: 16px;
+            border: 2px solid var(--color-white);
+        }
+        #rules-column h2 { color: var(--color-white); text-align: center; }
+        #rules-column ul { padding-left: 20px; }
+        #rules-column li { margin-bottom: 10px; line-height: 1.4; }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 12px 16px;
+            border: 2px solid var(--color-white);
+            border-radius: 8px;
+            background-color: var(--color-black);
+            color: var(--color-white);
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        button:active { 
+            transform: scale(0.95);
+            background-color: var(--color-white);
+            color: var(--color-black);
+        }
+        
+        #progress-container {
+            width: 90vmin;
+            max-width: 500px;
+            height: 20px;
+            border: 2px solid var(--color-white);
+            border-radius: 5px;
+            background-color: var(--color-black);
+            margin-bottom: 10px;
+            padding: 2px;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: var(--color-white);
+            transition: width 0.2s linear;
+        }
+        #beat-text {
+            color: var(--color-white);
+            font-size: 1rem;
+            margin-bottom: 10px;
+            height: 1rem;
+        }
+
+        #game-container {
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 500px;
+            max-height: 500px;
+            background-color: var(--color-black);
+            border-radius: 16px;
+            border: 2px solid var(--color-white);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #krystal-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            align-items: center;
+            justify-content: center;
+        }
+        #krystal-content {
+            background-color: var(--color-black);
+            border: 2px solid var(--color-white);
+            border-radius: 16px;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            position: relative;
+        }
+        #krystal-close {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        /* --- THIS IS THE CSS CHANGE --- */
+        #krystal-canvas-container {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 8px;
+            margin-top: 10px;
+            cursor: grab;
+            touch-action: none;
+            /* Added glow filter */
+            filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px #fff) brightness(1.2);
+        }
+        
+        @media (min-width: 800px) {
+            #main-container { flex-direction: row; align-items: flex-start; }
+            #game-column { width: auto; }
+            #rules-column { width: 320px; flex-shrink: 0; margin-top: 128px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <div id="game-column">
+            <div id="controls">
+                <button id="tier1">Tier 1</button>
+                <button id="tier2">Tier 2</button>
+                <button id="tier3">Tier 3</button>
+                <button id="tier4">Tier 4</button>
+                <button id="tier5">Tier 5</button>
+            </div>
+            
+            <div id="progress-container">
+                <div id="progress-bar"></div>
+            </div>
+            <div id="beat-text">Attunement Progress...</div>
+
+            <div id="game-container">
+                <canvas id="game-canvas"></canvas>
+            </div>
+            
+            <div id="message" style="min-height: 0;"></div> 
+        </div>
+
+        <div id="rules-column">
+            <h2>How to Attune</h2>
+            <ul>
+                <li>White "notes" will descend on the strings.</li>
+                <li>When a note enters the horizontal "hit zone"...</li>
+                <li>**Click and drag** the note left or right to score.</li>
+                <li>Fill the progress bar to 100% to attune the fragment!</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="krystal-modal">
+        <div id="krystal-content">
+            <span id="krystal-close">&times;</span>
+            <h2 id="krystal-title" style="color: var(--color-hit);">KRYSTAL MINED!</h2>
+            <p>You received a <strong id="krystal-name"></strong>!</p>
+            <div id="krystal-canvas-container"></div>
+            <p id="krystal-error" style="color: var(--color-miss); display: none;"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const gameCanvas = document.getElementById('game-canvas');
+        const ctx = gameCanvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+        const progressBar = document.getElementById('progress-bar');
+        const beatText = document.getElementById('beat-text');
+        
+        // --- Audio Setup ---
+        let audioContext;
+        let musicLoopInterval;
+
+        // --- Game State ---
+        let gameLoopId;
+        let notes = [];
+        let particles = [];
+        let strings = [];
+        let numStrings = 4;
+        let noteRadius = 15;
+        let hitZone = {};
+        let gameActive = false;
+        let noteSpeed = 2;
+        let current16thNote = 0;
+        let tempo = 120;
+        let draggedNote = null;
+        let combo = 0;
+        let successfulHits = 0;
+        let totalHitsToWin = 30;
+        let floatingTexts = [];
+
+        // --- Krystal Modal State ---
+        const modal = document.getElementById('krystal-modal');
+        const krystalName = document.getElementById('krystal-name');
+        const krystalCanvasContainer = document.getElementById('krystal-canvas-container');
+        const closeModal = document.getElementById('krystal-close');
+        const krystalError = document.getElementById('krystal-error');
+        const krystalTitle = document.getElementById('krystal-title');
+        let currentTier = 0;
+        let scene, camera, renderer, krystalGroup, animationId;
+        let isDragging = false, previousPointerX = 0, previousPointerY = 0;
+        let spinVelocityX = 0, spinVelocityY = 0;
+        let autoRotateX = 0.005, autoRotateY = 0.007;
+        const damping = 0.95;
+
+        // --- Canvas Sizing ---
+        function resizeCanvas() {
+            gameCanvas.width = gameContainer.clientWidth;
+            gameCanvas.height = gameContainer.clientHeight;
+            
+            strings = [];
+            const stringSpacing = gameCanvas.width / (numStrings + 1);
+            for (let i = 0; i < numStrings; i++) {
+                strings.push({ x: stringSpacing * (i + 1), shake: 0 });
+            }
+            noteRadius = Math.max(10, 18 - numStrings);
+            
+            hitZone.y = gameCanvas.height * 0.8;
+            hitZone.height = 110; // Wide hit zone
+            
+            const msPerBeat = (60 / tempo) * 1000;
+            const msToTravel = msPerBeat * 2;
+            noteSpeed = (gameCanvas.height / (msToTravel / (1000 / 60))) * 0.75;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- Tier Buttons ---
+        document.getElementById('tier1').onclick = () => startGame(1, 30, 100, 3);
+        document.getElementById('tier2').onclick = () => startGame(2, 40, 110, 4);
+        document.getElementById('tier3').onclick = () => startGame(3, 50, 120, 4);
+        document.getElementById('tier4').onclick = () => startGame(4, 60, 130, 5);
+        document.getElementById('tier5').onclick = () => startGame(5, 70, 140, 5);
+        
+        // --- Audio Initialization ---
+        function initAudio() {
+            if (!audioContext) {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.error("Web Audio API is not supported in this browser.", e);
+                    return;
+                }
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+        
+        // --- Game Logic ---
+        function startGame(tier, hitsToWin, gameTempo, newNumStrings) {
+            initAudio(); 
+            currentTier = tier;
+            totalHitsToWin = hitsToWin;
+            tempo = gameTempo;
+            numStrings = newNumStrings;
+            
+            notes = [];
+            particles = [];
+            combo = 0;
+            successfulHits = 0;
+            current16thNote = 0;
+            floatingTexts = [];
+            progressBar.style.width = '0%';
+            beatText.textContent = `Attuning at ${tempo} BPM...`;
+            
+            resizeCanvas(); 
+
+            if (musicLoopInterval) clearInterval(musicLoopInterval);
+            const msPer16thNote = (60 / tempo) * 1000 / 4;
+            musicLoopInterval = setInterval(musicLoop, msPer16thNote);
+
+            gameActive = true;
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            visualGameLoop();
+        }
+
+        // --- Music Loop ---
+        function musicLoop() {
+            if (!gameActive) return;
+            
+            if (current16thNote % 16 === 0) { playKick(); generateNotes(1); }
+            if (current16thNote % 16 === 4) { playKick(); generateNotes(numStrings >= 3 ? 3 : 1); }
+            if (current16thNote % 16 === 8) { playKick(); generateNotes(2); }
+            if (current16thNote % 16 === 12) { playKick(); generateNotes(numStrings >= 4 ? 4 : 2); }
+            if (numStrings >= 5) {
+                if (current16thNote % 16 === 6) { generateNotes(5); }
+                if (current16thNote % 16 === 14) { generateNotes(1); }
+            }
+            if (current16thNote % 2 === 0) { playHiHat(); }
+            current16thNote = (current16thNote + 1) % 16;
+        }
+
+        function generateNotes(stringIndex) {
+            notes.push({
+                x: strings[stringIndex - 1].x,
+                y: 0,
+                radius: noteRadius,
+                stringIndex: stringIndex - 1,
+                hit: false,
+                miss: false,
+                isDragging: false
+            });
+        }
+        
+        // --- Visual Game Loop ---
+        function visualGameLoop() {
+            if (!gameActive) return;
+            ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+            drawUI();
+            updateParticles();
+            updateNotes();
+            updateFloatingText();
+            let progress = (successfulHits / totalHitsToWin) * 100;
+            progressBar.style.width = `${progress}%`;
+            if (progress >= 100) {
+                winGame();
+            } else {
+                gameLoopId = requestAnimationFrame(visualGameLoop);
+            }
+        }
+        
+        function drawUI() {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.lineWidth = 2;
+            for (let i = 0; i < strings.length; i++) {
+                let string = strings[i];
+                let xPos = string.x;
+                if (string.shake > 0) {
+                    xPos += (Math.random() - 0.5) * 8;
+                    string.shake--;
+                }
+                ctx.beginPath();
+                ctx.moveTo(xPos, 0);
+                ctx.lineTo(xPos, gameCanvas.height);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.rect(0, hitZone.y - hitZone.height / 2, gameCanvas.width, hitZone.height);
+            ctx.stroke();
+        }
+
+        function updateNotes() {
+            for (let i = notes.length - 1; i >= 0; i--) {
+                let note = notes[i];
+                if (!note.isDragging) note.y += noteSpeed;
+                
+                if (note.y > hitZone.y + hitZone.height / 2 && !note.hit && !note.miss) {
+                    note.miss = true;
+                    combo = 0;
+                    floatingTexts.push(createFloatingText("Miss!", note.x, note.y, "#ff0000"));
+                    playMissSound();
+                }
+                
+                if (note.y > gameCanvas.height + note.radius || (note.hit && !note.isDragging)) {
+                    notes.splice(i, 1);
+                    continue;
+                }
+                
+                let color = "var(--color-white)";
+                if (note.miss) color = "var(--color-miss)";
+                if (note.hit) continue; 
+                
+                let xPos = note.x;
+                let string = strings[note.stringIndex];
+                if (string.shake > 0) {
+                    xPos += (Math.random() - 0.5) * 8;
+                }
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(xPos, note.y, note.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+        
+        function updateFloatingText() {
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let text = floatingTexts[i];
+                text.y -= 1;
+                text.alpha -= 0.02;
+                if (text.alpha <= 0) {
+                    floatingTexts.splice(i, 1);
+                    continue;
+                }
+                let color = text.color === '#00ff00' ? '0, 255, 0' : '255, 0, 0';
+                ctx.fillStyle = `rgba(${color}, ${text.alpha})`;
+                ctx.font = 'bold 1.5rem Orbitron';
+                ctx.textAlign = 'center';
+                ctx.fillText(text.message, text.x, text.y);
+            }
+        }
+        
+        function createFloatingText(message, x, y, color) {
+            return { message, x, y, color, alpha: 1.0 };
+        }
+        
+        // --- Particle Functions ---
+        function createParticleExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push(createParticle(x, y, color));
+            }
+        }
+        function createParticle(x, y, color) {
+            return {
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                alpha: 1.0,
+                size: Math.random() * 3 + 1,
+                color: color
+            };
+        }
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // --- Input Handlers ---
+        gameCanvas.addEventListener('pointerdown', (e) => {
+            if (!gameActive) return;
+            const rect = gameCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            for (let note of notes) {
+                const dist = Math.hypot(x - note.x, y - note.y);
+                const isInHitZone = note.y > hitZone.y - hitZone.height / 2 && note.y < hitZone.y + hitZone.height / 2;
+                if (dist < note.radius * 2 && isInHitZone && !note.hit) {
+                    note.isDragging = true;
+                    draggedNote = note;
+                    break;
+                }
+            }
+        });
+        gameCanvas.addEventListener('pointermove', (e) => {
+            if (draggedNote && !draggedNote.hit) {
+                const rect = gameCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                if (Math.abs(x - strings[draggedNote.stringIndex].x) > 20) {
+                    draggedNote.hit = true;
+                    successfulHits++;
+                    combo++;
+                    floatingTexts.push(createFloatingText(`Combo: ${combo}`, draggedNote.x, draggedNote.y, "#00ff00"));
+                    playHitSound();
+                    createParticleExplosion(draggedNote.x, draggedNote.y, '#ffffff');
+                    strings[draggedNote.stringIndex].shake = 15;
+                    draggedNote.isDragging = false;
+                    draggedNote = null;
+                }
+            }
+        });
+        window.addEventListener('pointerup', () => {
+            if (draggedNote) {
+                draggedNote.isDragging = false;
+                draggedNote = null;
+            }
+        });
+        
+        // --- Win/Lose ---
+        function winGame() {
+            gameActive = false;
+            beatText.textContent = 'Attunement Complete!';
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            if (musicLoopInterval) clearInterval(musicLoopInterval);
+            showKrystalModal(currentTier);
+        }
+
+        // --- Audio Generation Functions (Unchanged) ---
+        function playKick() { /* ... */ }
+        function playHiHat() { /* ... */ }
+        function playHitSound() { /* ... */ }
+        function playMissSound() { /* ... */ }
+        (function() {
+            // (Self-contained audio functions)
+            playKick = function() {
+                if (!audioContext) return;
+                const time = audioContext.currentTime;
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(150, time);
+                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.1);
+                gain.gain.setValueAtTime(1, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                osc.start(time);
+                osc.stop(time + 0.1);
+            }
+            playHiHat = function() {
+                if (!audioContext) return;
+                const time = audioContext.currentTime;
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'square';
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(6000, time);
+                gain.gain.setValueAtTime(0.3, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
+                osc.start(time);
+                osc.stop(time + 0.05);
+            }
+            playHitSound = function() {
+                if (!audioContext) return;
+                const time = audioContext.currentTime;
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'sine';
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(800, time);
+                osc.frequency.exponentialRampToValueAtTime(1000, time + 0.1);
+                gain.gain.setValueAtTime(0.5, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                osc.start(time);
+                osc.stop(time + 0.1);
+            }
+            playMissSound = function() {
+                if (!audioContext) return;
+                const time = audioContext.currentTime;
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'square';
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(200, time);
+                osc.frequency.exponentialRampToValueAtTime(100, time + 0.1);
+                gain.gain.setValueAtTime(0.5, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                osc.start(time);
+                osc.stop(time + 0.1);
+            }
+        })();
+
+        // --- KRYSTAL MODAL LOGIC ---
+        closeModal.onclick = () => {
+            modal.style.display = "none";
+            if (animationId) cancelAnimationFrame(animationId);
+            if(renderer) renderer.dispose();
+            krystalCanvasContainer.innerHTML = '';
+            krystalError.style.display = 'none';
+            window.removeEventListener('pointerup', onPointerUp);
+        }
+        
+        function showKrystalModal(tier) {
+            modal.style.display = "flex";
+            krystalError.style.display = 'none';
+            krystalTitle.style.color = 'var(--color-hit)';
+            krystalTitle.textContent = 'KRYSTAL MINED!';
+            try {
+                if (typeof THREE === 'undefined') {
+                    throw new Error("3D Library (Three.js) failed to load.");
+                }
+                init3DScene(tier);
+            } catch (error) {
+                console.error(error);
+                krystalCanvasContainer.innerHTML = '';
+                krystalTitle.style.color = 'var(--color-miss)';
+                krystalTitle.textContent = 'Render Error';
+                krystalName.textContent = getKrystalName(tier);
+                krystalError.textContent = "Could not display 3D Krystal. Your browser may not support WebGL.";
+                krystalError.style.display = 'block';
+            }
+        }
+        
+        function init3DScene(tier) {
+            krystalCanvasContainer.innerHTML = '';
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            camera = new THREE.PerspectiveCamera(75, krystalCanvasContainer.clientWidth / krystalCanvasContainer.clientHeight, 0.1, 1000);
+            camera.position.z = 3.5;
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(krystalCanvasContainer.clientWidth, krystalCanvasContainer.clientHeight);
+            krystalCanvasContainer.appendChild(renderer.domElement);
+            // No lights needed for vector style
+            
+            krystalGroup = createKrystalCluster(tier);
+            scene.add(krystalGroup);
+            
+            krystalCanvasContainer.addEventListener('pointerdown', onPointerDown);
+            krystalCanvasContainer.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+            krystalCanvasContainer.addEventListener('pointerleave', onPointerUp);
+            isDragging = false;
+            spinVelocityX = 0; spinVelocityY = 0;
+            autoRotateX = 0.005; autoRotateY = 0.007;
+            animate();
+        }
+        
+        function onPointerDown(e) { /* ... (unchanged) ... */ }
+        function onPointerMove(e) { /* ... (unchanged) ... */ }
+        function onPointerUp() { /* ... (unchanged) ... */ }
+        (function() {
+            onPointerDown = function(e) {
+                isDragging = true;
+                spinVelocityX = 0; spinVelocityY = 0;
+                autoRotateX = 0; autoRotateY = 0;
+                previousPointerX = e.clientX;
+                previousPointerY = e.clientY;
+                krystalCanvasContainer.style.cursor = 'grabbing';
+            }
+            onPointerMove = function(e) {
+                if (!isDragging) return;
+                const deltaX = e.clientX - previousPointerX;
+                const deltaY = e.clientY - previousPointerY;
+                krystalGroup.rotation.y += deltaX * 0.01;
+                krystalGroup.rotation.x += deltaY * 0.01;
+                spinVelocityX = deltaX * 0.01;
+                spinVelocityY = deltaY * 0.01;
+                previousPointerX = e.clientX;
+                previousPointerY = e.clientY;
+            }
+            onPointerUp = function() {
+                isDragging = false;
+                krystalCanvasContainer.style.cursor = 'grab';
+            }
+        })();
+
+        function getKrystalName(tier) {
+            switch (tier) {
+                case 1: return "Shard Cluster";
+                case 2: return "Krystal Cluster";
+                case 3: return "Geode Cluster";
+                case 4: return "Prismatic Matrix";
+                case 5: return "Legendary Formation";
+                default: return "Krystal";
+            }
+        }
+
+        // --- THIS IS THE JAVASCRIPT CHANGE ---
+        function createKrystalCluster(tier) {
+            let krystalTierName = getKrystalName(tier);
+            krystalName.textContent = krystalTierName;
+            
+            let krystalGroup = new THREE.Group();
+            let clusterParams = {
+                1: { numCrystals: 2 + Math.floor(Math.random() * 2), baseComplexity: 0, clusterSize: 0.1 },
+                2: { numCrystals: 5 + Math.floor(Math.random() * 3), baseComplexity: 0, clusterSize: 0.3 },
+                3: { numCrystals: 9 + Math.floor(Math.random() * 3), baseComplexity: 1, clusterSize: 0.5 },
+                4: { numCrystals: 15 + Math.floor(Math.random() * 4), baseComplexity: 1, clusterSize: 0.7 },
+                5: { numCrystals: 22 + Math.floor(Math.random() * 5), baseComplexity: 2, clusterSize: 1.0 }
+            };
+            let params = clusterParams[tier] || clusterParams[3];
+            
+            for (let i = 0; i < params.numCrystals; i++) {
+                let geomRadius = 0.2 + Math.random() * 0.4;
+                let complexity = Math.max(0, params.baseComplexity + Math.floor(Math.random() * 2));
+                let geometry = new THREE.OctahedronGeometry(geomRadius, complexity);
+
+                // --- MODIFICATION: Removed solid material ---
+                // const material = new THREE.MeshPhongMaterial({ ... });
+                // let krystal = new THREE.Mesh(geometry, material);
+                
+                const edges = new THREE.EdgesGeometry(geometry);
+                
+                // --- MODIFICATION: Styled wireframe material ---
+                const lineMaterial = new THREE.LineBasicMaterial({
+                    color: 0xffffff,
+                    linewidth: 2, // Note: this may not work on all systems, 1 is safer
+                    transparent: false,
+                    opacity: 1
+                });
+                const wireframe = new THREE.LineSegments(edges, lineMaterial);
+
+                // --- MODIFICATION: Apply transforms to wireframe ---
+                if (Math.random() > 0.3) {
+                    wireframe.scale.set(
+                        0.4 + Math.random() * 0.3, 1.5 + Math.random() * 2.0, 0.4 + Math.random() * 0.3
+                    );
+                } else {
+                     wireframe.scale.set(
+                        0.8 + Math.random() * 0.5, 0.8 + Math.random() * 0.5, 0.8 + Math.random() * 0.5
+                    );
+                }
+                wireframe.position.set(
+                    (Math.random() - 0.5) * params.clusterSize,
+                    (Math.random() - 0.5) * params.clusterSize,
+                    (Math.random() - 0.5) * params.clusterSize
+                );
+                wireframe.rotation.set(
+                    Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI
+                );
+                
+                // --- MODIFICATION: Add wireframe directly to group ---
+                // krystal.add(wireframe);
+                krystalGroup.add(wireframe);
+            }
+            
+            // krystalGroup.userData.baseHue = baseHue; // No longer needed
+            return krystalGroup;
+        }
+        
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            if (krystalGroup) {
+                if (!isDragging) {
+                    if (Math.abs(spinVelocityX) > 0.0001 || Math.abs(spinVelocityY) > 0.0001) {
+                        krystalGroup.rotation.y += spinVelocityX;
+                        krystalGroup.rotation.x += spinVelocityY;
+                        spinVelocityX *= damping;
+                        spinVelocityY *= damping;
+                    } else {
+                        spinVelocityX = 0; spinVelocityY = 0;
+                        if (autoRotateX < 0.005) autoRotateX += 0.0001;
+                        if (autoRotateY < 0.007) autoRotateY += 0.0001;
+                        krystalGroup.rotation.x += autoRotateX;
+                        krystalGroup.rotation.y += autoRotateY;
+                    }
+                }
+                
+                // --- MODIFICATION: Removed color fading ---
+                // const time = performance.now() * 0.0005;
+                // ... (rest of color fade logic removed) ...
+            }
+            if (renderer) renderer.render(scene, camera);
+        }
+
+    </script>
+</body>
+</html>
